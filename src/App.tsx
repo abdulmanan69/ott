@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Bookmark,
   Check,
@@ -74,6 +74,7 @@ function App() {
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [searchError, setSearchError] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tvEmbedUrl, setTvEmbedUrl] = useState(() => readEmbedSetting('morrow-tv-embed-url', DEFAULT_TV_EMBED_URL, 'tv', 'morrow-embed-url'))
   const [movieEmbedUrl, setMovieEmbedUrl] = useState(() => readEmbedSetting('morrow-movie-embed-url', DEFAULT_MOVIE_EMBED_URL, 'movie'))
@@ -250,8 +251,11 @@ function App() {
         </nav>
         <div className="topbar-actions">
           <form className={searchOpen ? 'search-box search-expanded' : 'search-box'} onSubmit={(event) => { event.preventDefault(); setSearchOpen(true) }}>
-            <Search size={18} aria-hidden="true" />
-            <input aria-label="Search titles" placeholder="Search stories" value={query} onChange={(event) => { setQuery(event.target.value); setSearchOpen(true) }} onFocus={() => setSearchOpen(true)} />
+            <button type="button" className="search-open-button" aria-label="Open search" onClick={() => {
+              setSearchOpen(true)
+              window.requestAnimationFrame(() => searchInputRef.current?.focus())
+            }}><Search size={18} aria-hidden="true" /></button>
+            <input ref={searchInputRef} aria-label="Search titles" placeholder="Search stories" value={query} onChange={(event) => { setQuery(event.target.value); setSearchOpen(true) }} onFocus={() => setSearchOpen(true)} />
             {query && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => setQuery('')}><X size={15} /></button>}
           </form>
           <button className="icon-button settings-trigger" title="Playback settings" aria-label="Playback settings" onClick={() => { setEmbedDrafts({ tv: tvEmbedUrl, movie: movieEmbedUrl }); setSettingsOpen(true) }}><Settings2 size={17} /></button>
