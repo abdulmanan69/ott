@@ -38,7 +38,7 @@ wrangler deploy --config cloudflare/wrangler.toml
 ```
 
 7. In `abdulmanan69/ott`, add the Worker endpoint as the `VITE_TMDB_PROXY_URL` Actions variable. Its value is the deployed Worker origin plus `/tmdb`, for example `https://glassflix-cinema-tmdb.account.workers.dev/tmdb`.
-8. Under **Settings > Pages**, choose **GitHub Actions** as the deployment source. Push to `main` or manually run **Actions > Deploy GlassFlix Cinema to GitHub Pages**. The site URL will be `https://abdulmanan69.github.io/ott/`.
+8. GitHub Pages is configured to use **GitHub Actions** for `abdulmanan69/ott`. Push to `main` or manually run **Actions > Deploy GlassFlix Cinema to GitHub Pages**. The site URL is `https://abdulmanan69.github.io/ott/`.
 
 The Pages workflow builds and deploys the static app. It never receives the TMDB token. Because the Worker is a public API endpoint, configure Cloudflare rate limiting for `/tmdb/*`; origin checks and response caching reduce accidental traffic but are not authentication. If `VITE_TMDB_PROXY_URL` is not set, the build still succeeds, but TMDB feeds display a setup message until the Worker is deployed and configured.
 

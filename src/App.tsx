@@ -236,7 +236,7 @@ function App() {
       <header className="topbar">
         <a className="wordmark" href="#home" aria-label="GlassFlix Cinema home" onClick={() => { setView('For you'); setGenre('All') }}>
           <span className="brand-mark"><span /></span>
-          <span>GLASSFLIX</span>
+          <span>GLASSFLIX CINEMA</span>
         </a>
         <button className="mobile-menu icon-button" title="Open navigation" aria-label="Open navigation" onClick={() => setMobileMenu(!mobileMenu)}>
           {mobileMenu ? <X size={20} /> : <Menu size={20} />}
@@ -384,7 +384,7 @@ function App() {
         </section>
       )}
 
-      <footer className="site-footer"><a className="wordmark footer-mark" href="#home"><span className="brand-mark"><span /></span><span>GLASSFLIX</span></a><span>GlassFlix Cinema</span><span className="footer-tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB.</span><span className="footer-right">A PERSONAL CATALOG <span className="eyebrow-dot" /> 2026</span></footer>
+      <footer className="site-footer"><a className="wordmark footer-mark" href="#home"><span className="brand-mark"><span /></span><span>GLASSFLIX CINEMA</span></a><span>Stories in their own orbit.</span><span className="footer-tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB.</span><span className="footer-right">A PERSONAL CATALOG <span className="eyebrow-dot" /> 2026</span></footer>
 
       {selected && (
         <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null) }}>
