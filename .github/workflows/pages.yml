@@ -30,7 +30,7 @@ jobs:
       - name: Build static site
         run: npm run build
         env:
-          VITE_TMDB_PROXY_URL: ${{ vars.VITE_TMDB_PROXY_URL }}
+          VITE_TMDB_API_KEY: ${{ vars.VITE_TMDB_API_KEY }}
           VITE_TV_EMBED_URL: ${{ vars.VITE_TV_EMBED_URL }}
           VITE_MOVIE_EMBED_URL: ${{ vars.VITE_MOVIE_EMBED_URL }}
       - name: Configure Pages

@@ -40,11 +40,24 @@ const genreNames: Record<number, string> = {
   10765: 'Science fiction',
 }
 
+const publicApiKey = import.meta.env.VITE_TMDB_API_KEY || ''
 const configuredProxyBase = import.meta.env.VITE_TMDB_PROXY_URL?.replace(/\/$/, '')
-const proxyBase = configuredProxyBase || (import.meta.env.DEV ? '/api/tmdb' : '')
+const proxyBase = configuredProxyBase || (import.meta.env.DEV && !publicApiKey ? '/api/tmdb' : '')
 
 async function requestTmdb<T>(path: string, signal: AbortSignal): Promise<T> {
-  if (!proxyBase) throw new Error('TMDB service is not configured. Deploy the Cloudflare Worker and set VITE_TMDB_PROXY_URL in GitHub Actions variables.')
+  if (publicApiKey) {
+    const [pathname, search = ''] = path.split('?')
+    const upstreamPath = pathname === '/search' ? '/search/multi' : pathname
+    const url = new URL(`https://api.themoviedb.org/3${upstreamPath}`)
+    new URLSearchParams(search).forEach((value, key) => url.searchParams.set(key, value))
+    url.searchParams.set('api_key', publicApiKey)
+    const response = await fetch(url, { signal })
+    const payload = await response.json() as T & { status_message?: string }
+    if (!response.ok) throw new Error(payload.status_message || 'TMDB request failed. Check the configured API key.')
+    return payload
+  }
+
+  if (!proxyBase) throw new Error('TMDB is not configured. Set VITE_TMDB_API_KEY in the GitHub Actions repository variables.')
   const response = await fetch(`${proxyBase}${path}`, { signal })
   const payload = await response.json() as T & { status_message?: string }
   if (!response.ok) throw new Error(payload.status_message || 'TMDB request failed. Check the key and try again.')
@@ -133,7 +146,23 @@ function normalizeDiscoverItems(items: TmdbDiscoverItem[], fallbackType?: 'movie
 }
 
 export async function fetchTmdbHome(signal: AbortSignal): Promise<TmdbHomeCollections> {
-  const payload = await requestTmdb<TmdbHomeResponse>('/home', signal)
+  let payload: TmdbHomeResponse
+  if (publicApiKey) {
+    const endpoints = {
+      trending: '/trending/all/week?language=en-US',
+      popularMovies: '/movie/popular?language=en-US',
+      popularTv: '/tv/popular?language=en-US',
+      topRatedMovies: '/movie/top_rated?language=en-US',
+      topRatedTv: '/tv/top_rated?language=en-US',
+    }
+    const entries = await Promise.all(Object.entries(endpoints).map(async ([key, path]) => [
+      key,
+      await requestTmdb<TmdbDiscoverList>(path, signal),
+    ] as const))
+    payload = Object.fromEntries(entries) as TmdbHomeResponse
+  } else {
+    payload = await requestTmdb<TmdbHomeResponse>('/home', signal)
+  }
 
   const combine = (movies?: TmdbDiscoverList, tv?: TmdbDiscoverList) => [
     ...normalizeDiscoverItems(movies?.results ?? [], 'movie'),
