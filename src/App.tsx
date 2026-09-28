@@ -20,8 +20,8 @@ import { fetchTmdbHome, searchTmdb, type TmdbHomeCollections } from './tmdb'
 
 type View = 'For you' | 'Films' | 'Series' | 'My list'
 
-const DEFAULT_TV_EMBED_URL = import.meta.env.VITE_TV_EMBED_URL || ''
-const DEFAULT_MOVIE_EMBED_URL = import.meta.env.VITE_MOVIE_EMBED_URL || ''
+const DEFAULT_TV_EMBED_URL = 'https://nxsha.space/embed/tv/'
+const DEFAULT_MOVIE_EMBED_URL = 'https://nxsha.space/embed/movie/'
 
 function readSavedTitles(): string[] {
   try {

@@ -8,13 +8,7 @@ A key included in a static GitHub Pages app is public: anyone can inspect the br
 
 ## GitHub Pages
 
-The site is published at [https://abdulmanan69.github.io/ott/](https://abdulmanan69.github.io/ott/). The repository's GitHub Actions Pages deployment uses these Actions repository variables:
-
-- `VITE_TMDB_API_KEY`: your TMDB v3 API key
-- `VITE_TV_EMBED_URL`: authorized TV embed URL prefix
-- `VITE_MOVIE_EMBED_URL`: authorized movie embed URL prefix
-
-Edit them under **Settings > Secrets and variables > Actions > Variables**. After changing a variable, rerun **Actions > Deploy GlassFlix Cinema to GitHub Pages** or push a new commit. The TMDB key is public in the built site; URL prefixes are also public.
+The site is published at [https://abdulmanan69.github.io/ott/](https://abdulmanan69.github.io/ott/). The GitHub Actions Pages workflow reads the TMDB v3 API key from the `VITE_TMDB_API_KEY` repository variable. After changing it, rerun **Actions > Deploy GlassFlix Cinema to GitHub Pages** or push a new commit. The TMDB key is public in the built site.
 
 ## Local development
 
@@ -29,7 +23,7 @@ npm run dev
 
 ## Playback
 
-TMDB IDs are appended to the configured player prefixes. TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding.
+The player URL prefixes are set directly in `src/App.tsx`: `https://nxsha.space/embed/tv/` and `https://nxsha.space/embed/movie/`. TMDB IDs are appended to those prefixes; TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding.
 
 ## Attribution
 
