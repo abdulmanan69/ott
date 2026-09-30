@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
-  Download,
   Info,
   Menu,
   Play,
@@ -16,7 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { catalog, genres, type Title } from './catalog'
-import { PLAYBACK_SERVERS, getAuthorizedEmbedPrefix, getAuthorizedPlaybackUrl, getRivestreamUrl, getServerEmbedUrl, isPlaybackServer, type PlaybackServer } from './playback'
+import { getAuthorizedEmbedPrefix, getAuthorizedPlaybackUrl, getTitleEmbedUrl } from './playback'
 import { fetchTmdbHome, searchTmdb, type TmdbHomeCollections } from './tmdb'
 
 type View = 'For you' | 'Films' | 'Series' | 'My list'
@@ -58,11 +57,6 @@ function readEmbedSetting(key: string, fallback: string, type: 'tv' | 'movie', l
   return fallback
 }
 
-function readPlaybackServer(): PlaybackServer {
-  const saved = localStorage.getItem('morrow-playback-server')
-  return isPlaybackServer(saved) ? saved : 'nxsha'
-}
-
 function persistEmbedSetting(key: string, value: string, defaultValue: string) {
   if (value === defaultValue) localStorage.removeItem(key)
   else localStorage.setItem(key, value)
@@ -85,7 +79,6 @@ function App() {
   const [tvEmbedUrl, setTvEmbedUrl] = useState(() => readEmbedSetting('morrow-tv-embed-url', DEFAULT_TV_EMBED_URL, 'tv', 'morrow-embed-url'))
   const [movieEmbedUrl, setMovieEmbedUrl] = useState(() => readEmbedSetting('morrow-movie-embed-url', DEFAULT_MOVIE_EMBED_URL, 'movie'))
   const [embedDrafts, setEmbedDrafts] = useState({ tv: '', movie: '' })
-  const [server, setServer] = useState<PlaybackServer>(readPlaybackServer)
   const [watchlist, setWatchlist] = useState<string[]>(readSavedTitles)
   const [savedTmdbTitles, setSavedTmdbTitles] = useState<Title[]>(readSavedTmdbTitles)
   const [selected, setSelected] = useState<Title | null>(null)
@@ -107,10 +100,6 @@ function App() {
     persistEmbedSetting('morrow-movie-embed-url', movieEmbedUrl, DEFAULT_MOVIE_EMBED_URL)
     localStorage.removeItem('morrow-embed-url')
   }, [tvEmbedUrl, movieEmbedUrl])
-
-  useEffect(() => {
-    localStorage.setItem('morrow-playback-server', server)
-  }, [server])
 
   useEffect(() => {
     if (!selected && !player && !settingsOpen) return
@@ -225,14 +214,8 @@ function App() {
   }
 
   const startPlayback = (title: Title) => {
-    const embedUrl = getServerEmbedUrl(title, server, tvEmbedUrl, movieEmbedUrl)
+    const embedUrl = getTitleEmbedUrl(title, tvEmbedUrl, movieEmbedUrl)
     if (!embedUrl && !getAuthorizedPlaybackUrl(title)) {
-      if (title.tmdbId) {
-        setServer('rive')
-        setSelected(null)
-        setPlayer(title)
-        return
-      }
       setSelected(title)
       setNotice('No matching authorized embed URL is configured for this title.')
       return
@@ -247,8 +230,7 @@ function App() {
   const moveHero = (direction: -1 | 1) => {
     setHeroIndex((current) => (current + direction + trending.length) % trending.length)
   }
-  const playerEmbedUrl = player ? getServerEmbedUrl(player, server, tvEmbedUrl, movieEmbedUrl) : null
-  const playerDownloadUrl = player ? getRivestreamUrl(player, 'download') : null
+  const playerEmbedUrl = player ? getTitleEmbedUrl(player, tvEmbedUrl, movieEmbedUrl) : null
 
   return (
     <main className="app-shell">
@@ -426,15 +408,6 @@ function App() {
               ? <iframe src={playerEmbedUrl} title={`${player.name} player`} allow="autoplay; picture-in-picture; encrypted-media; clipboard-write" allowFullScreen />
               : <video controls autoPlay playsInline src={getAuthorizedPlaybackUrl(player) ?? undefined} />}
             <div className="player-title"><span>{player.name}</span><span>{player.year} · {player.duration}</span></div>
-            {player.tmdbId && (
-              <div className="player-servers" role="group" aria-label="Playback server">
-                <span className="player-servers-label">Server</span>
-                {PLAYBACK_SERVERS.map((item) => (
-                  <button key={item.id} className={`genre-chip ${server === item.id ? 'selected' : ''}`} aria-pressed={server === item.id} onClick={() => setServer(item.id)}>{item.label}</button>
-                ))}
-                {playerDownloadUrl && <a className="genre-chip player-download" href={playerDownloadUrl} target="_blank" rel="noopener noreferrer"><Download size={13} /> Download</a>}
-              </div>
-            )}
           </section>
         </div>
       )}
