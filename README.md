@@ -23,7 +23,7 @@ npm run dev
 
 ## Playback
 
-The player URL prefixes are set directly in `src/App.tsx`: `https://nxsha.space/embed/tv/` and `https://nxsha.space/embed/movie/`. TMDB IDs are appended to those prefixes; TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding.
+The player base URL is set directly in `src/App.tsx`: `https://nxsha.space/embed`. Titles are embedded as `?tmdb=<id>&type=movie&lan=eng` or `?tmdb=<id>&type=tv&s=1&e=1&lan=eng`; TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding.
 
 ## Attribution
 
