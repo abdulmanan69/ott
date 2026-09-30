@@ -168,6 +168,9 @@ a { color: inherit; text-decoration: none; }
 .player-modal .modal-close { top: -46px; right: 0; }
 .player-title { display: flex; justify-content: space-between; gap: 12px; padding: 15px 18px; color: #e9ede4; font-size: 12px; }
 .player-title span:last-child { color: #a7b0a5; font-size: 10px; }
+.player-servers { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 18px 16px; }
+.player-servers-label { color: #a7b0a5; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+.player-download { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; text-decoration: none; }
 .toast { position: fixed; z-index: 30; right: 24px; bottom: 24px; max-width: calc(100vw - 48px); display: flex; align-items: center; gap: 9px; padding: 12px 15px; border: 1px solid rgba(213,243,106,.22); border-radius: 3px; background: #252f26; color: #e4eadf; font-size: 11px; box-shadow: 0 8px 34px rgba(0,0,0,.3); animation: toast-in .2s ease both; }
 .toast svg { color: var(--lime); flex: 0 0 auto; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
