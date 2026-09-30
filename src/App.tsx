@@ -20,8 +20,8 @@ import { fetchTmdbHome, searchTmdb, type TmdbHomeCollections } from './tmdb'
 
 type View = 'For you' | 'Films' | 'Series' | 'My list'
 
-const DEFAULT_TV_EMBED_URL = 'https://nxsha.space/embed'
-const DEFAULT_MOVIE_EMBED_URL = 'https://nxsha.space/embed'
+const DEFAULT_TV_EMBED_URL = 'https://nxsha.space/embed/tv/'
+const DEFAULT_MOVIE_EMBED_URL = 'https://nxsha.space/embed/movie/'
 
 function readSavedTitles(): string[] {
   try {
@@ -269,17 +269,17 @@ function App() {
             <button className="modal-close icon-button" aria-label="Close playback settings" onClick={() => setSettingsOpen(false)}><X size={20} /></button>
             <p className="section-kicker">OPERATOR CONFIGURATION</p>
             <h2 id="settings-title">Playback sources</h2>
-            <p className="settings-description">Use an embed base like https://nxsha.space/embed (sends ?tmdb=, type, s, e, lan) or a path prefix ending in /tv/ or /movie/. TV results use season 1, episode 1.</p>
+            <p className="settings-description">Edit `.env.local` for URL prefixes. TMDB IDs are appended automatically; TV results use season 1, episode 1.</p>
             <label className="embed-label" htmlFor="tv-embed-url">TV URL prefix</label>
-            <textarea id="tv-embed-url" value={embedDrafts.tv} onChange={(event) => setEmbedDrafts((current) => ({ ...current, tv: event.target.value }))} placeholder="https://nxsha.space/embed" autoFocus />
+            <textarea id="tv-embed-url" value={embedDrafts.tv} onChange={(event) => setEmbedDrafts((current) => ({ ...current, tv: event.target.value }))} placeholder="https://example.space/embed/tv/" autoFocus />
             <label className="embed-label movie-embed-label" htmlFor="movie-embed-url">Movie URL prefix</label>
-            <textarea id="movie-embed-url" value={embedDrafts.movie} onChange={(event) => setEmbedDrafts((current) => ({ ...current, movie: event.target.value }))} placeholder="https://nxsha.space/embed" />
+            <textarea id="movie-embed-url" value={embedDrafts.movie} onChange={(event) => setEmbedDrafts((current) => ({ ...current, movie: event.target.value }))} placeholder="https://example.space/embed/movie/" />
             <div className="settings-actions">
               <button className="button button-primary" onClick={() => {
                 const normalizedTvUrl = getAuthorizedEmbedPrefix(embedDrafts.tv, 'tv')
                 const normalizedMovieUrl = getAuthorizedEmbedPrefix(embedDrafts.movie, 'movie')
                 if (!normalizedTvUrl || !normalizedMovieUrl) {
-                  setNotice('Use HTTP(S) embed URLs (TV field cannot end in /movie/, movie field cannot end in /tv/).')
+                  setNotice('Use HTTP(S) URL prefixes ending in /tv/ and /movie/.')
                   return
                 }
                 setTvEmbedUrl(normalizedTvUrl ?? '')
