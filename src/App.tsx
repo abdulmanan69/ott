@@ -405,7 +405,7 @@ function App() {
           <section className="player-modal" role="dialog" aria-modal="true" aria-label={`${player.name} player`}>
             <button className="modal-close icon-button" aria-label="Close player" onClick={() => setPlayer(null)}><X size={20} /></button>
             {playerEmbedUrl
-              ? <iframe src={playerEmbedUrl} title={`${player.name} player`} allow="autoplay; picture-in-picture; encrypted-media; clipboard-write" allowFullScreen />
+              ? <iframe src={playerEmbedUrl} title={`${player.name} player`} sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="autoplay; picture-in-picture; encrypted-media; clipboard-write" allowFullScreen />
               : <video controls autoPlay playsInline src={getAuthorizedPlaybackUrl(player) ?? undefined} />}
             <div className="player-title"><span>{player.name}</span><span>{player.year} · {player.duration}</span></div>
           </section>
