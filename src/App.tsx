@@ -129,6 +129,21 @@ function App() {
   }, [suggestOpen])
 
   useEffect(() => {
+    if (player || settingsOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      event.preventDefault()
+      setSearchOpen(true)
+      setSuggestOpen(true)
+      searchInputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [player, settingsOpen])
+
+  useEffect(() => {
     if (!selected?.tmdbId) {
       setRecommendations([])
       setRecStatus('idle')
@@ -289,6 +304,7 @@ function App() {
             }}><Search size={18} aria-hidden="true" /></button>
             <input ref={searchInputRef} aria-label="Search titles" placeholder="Search stories" value={query} onChange={(event) => { setQuery(event.target.value); setSearchOpen(true); setSuggestOpen(true) }} onFocus={() => { setSearchOpen(true); setSuggestOpen(true) }} />
             {query && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => { setQuery(''); setSuggestOpen(false) }}><X size={15} /></button>}
+            {!query && <kbd className="search-kbd" aria-hidden="true">/</kbd>}
             {suggestOpen && normalizedQuery.length >= 2 && (
               <div className="search-suggest" aria-label="TMDB suggestions">
                 {searchStatus === 'loading' && tmdbResults.length === 0 && <p className="suggest-status">Searching TMDB...</p>}
