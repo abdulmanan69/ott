@@ -1,4 +1,4 @@
-# GlassFlix Cinema Project Instructions
+# Sammy Flix Project Instructions
 
 - Keep demo titles fictional. Use only artwork the operator has rights to publish.
 - Playback URLs must be explicitly configured by the operator for authorized media. Do not add third-party streaming indexes, download endpoints, or scraping integrations.

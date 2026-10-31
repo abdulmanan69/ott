@@ -66,6 +66,20 @@ function registerTmdbProxy(server: ViteDevServer | PreviewServer, accessToken: s
         return
       }
 
+      if (requestUrl.pathname === '/api/tmdb/recommendations') {
+        const type = requestUrl.searchParams.get('type')
+        const id = Number(requestUrl.searchParams.get('id'))
+        if ((type !== 'movie' && type !== 'tv') || !Number.isInteger(id) || id <= 0) {
+          response.statusCode = 400
+          response.end(JSON.stringify({ error: 'Recommendations need type=movie|tv and a numeric id.' }))
+          return
+        }
+        const upstream = await fetchTmdb(`/${type}/${id}/recommendations?language=en-US`, accessToken)
+        response.statusCode = upstream.status
+        response.end(await upstream.text())
+        return
+      }
+
       response.statusCode = 404
       response.end(JSON.stringify({ error: 'Unknown TMDB endpoint.' }))
     } catch {
@@ -78,7 +92,7 @@ function registerTmdbProxy(server: ViteDevServer | PreviewServer, accessToken: s
 export default defineConfig(({ mode }) => {
   const { TMDB_ACCESS_TOKEN: accessToken = '' } = loadEnv(mode, process.cwd(), '')
   const localTmdbProxy: Plugin = {
-    name: 'glassflix-local-tmdb-proxy',
+    name: 'sammy-flix-local-tmdb-proxy',
     configureServer(server) {
       registerTmdbProxy(server, accessToken)
     },

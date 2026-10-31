@@ -1,4 +1,4 @@
-name: Deploy GlassFlix Cinema to GitHub Pages
+name: Deploy Sammy Flix to GitHub Pages
 
 on:
   push:

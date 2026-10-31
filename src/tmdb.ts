@@ -145,6 +145,15 @@ function normalizeDiscoverItems(items: TmdbDiscoverItem[], fallbackType?: 'movie
   })
 }
 
+export async function fetchTmdbRecommendations(title: Title, signal: AbortSignal): Promise<Title[]> {
+  if (!title.tmdbId) return []
+  const type = title.kind === 'Film' ? 'movie' : 'tv'
+  const payload = publicApiKey
+    ? await requestTmdb<TmdbDiscoverList>(`/${type}/${title.tmdbId}/recommendations?language=en-US`, signal)
+    : await requestTmdb<TmdbDiscoverList>(`/recommendations?type=${type}&id=${title.tmdbId}`, signal)
+  return normalizeDiscoverItems(payload.results ?? [], type).filter((item) => item.image).slice(0, 10)
+}
+
 export async function fetchTmdbHome(signal: AbortSignal): Promise<TmdbHomeCollections> {
   let payload: TmdbHomeResponse
   if (publicApiKey) {

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { catalog, genres, type Title } from './catalog'
 import { getAuthorizedEmbedPrefix, getAuthorizedPlaybackUrl, getTitleEmbedUrl } from './playback'
-import { fetchTmdbHome, searchTmdb, type TmdbHomeCollections } from './tmdb'
+import { fetchTmdbHome, fetchTmdbRecommendations, searchTmdb, type TmdbHomeCollections } from './tmdb'
 
 type View = 'For you' | 'Films' | 'Series' | 'My list'
 
@@ -74,7 +74,11 @@ function App() {
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [searchError, setSearchError] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [suggestOpen, setSuggestOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchBoxRef = useRef<HTMLFormElement>(null)
+  const [recommendations, setRecommendations] = useState<Title[]>([])
+  const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tvEmbedUrl, setTvEmbedUrl] = useState(() => readEmbedSetting('morrow-tv-embed-url', DEFAULT_TV_EMBED_URL, 'tv', 'morrow-embed-url'))
   const [movieEmbedUrl, setMovieEmbedUrl] = useState(() => readEmbedSetting('morrow-movie-embed-url', DEFAULT_MOVIE_EMBED_URL, 'movie'))
@@ -102,17 +106,45 @@ function App() {
   }, [tvEmbedUrl, movieEmbedUrl])
 
   useEffect(() => {
-    if (!selected && !player && !settingsOpen) return
+    if (!selected && !player && !settingsOpen && !suggestOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSelected(null)
         setPlayer(null)
         setSettingsOpen(false)
+        setSuggestOpen(false)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selected, player, settingsOpen])
+  }, [selected, player, settingsOpen, suggestOpen])
+
+  useEffect(() => {
+    if (!suggestOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) setSuggestOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [suggestOpen])
+
+  useEffect(() => {
+    if (!selected?.tmdbId) {
+      setRecommendations([])
+      setRecStatus('idle')
+      return
+    }
+    const controller = new AbortController()
+    setRecommendations([])
+    setRecStatus('loading')
+    fetchTmdbRecommendations(selected, controller.signal).then((results) => {
+      setRecommendations(results)
+      setRecStatus('ready')
+    }).catch(() => {
+      if (!controller.signal.aborted) setRecStatus('error')
+    })
+    return () => controller.abort()
+  }, [selected?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!notice) return
@@ -235,9 +267,9 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <a className="wordmark" href="#home" aria-label="GlassFlix Cinema home" onClick={() => { setView('For you'); setGenre('All') }}>
+        <a className="wordmark" href="#home" aria-label="Sammy Flix home" onClick={() => { setView('For you'); setGenre('All') }}>
           <span className="brand-mark"><span /></span>
-          <span>GLASSFLIX CINEMA</span>
+          <span>SAMMY FLIX</span>
         </a>
         <button className="mobile-menu icon-button" title="Open navigation" aria-label="Open navigation" onClick={() => setMobileMenu(!mobileMenu)}>
           {mobileMenu ? <X size={20} /> : <Menu size={20} />}
@@ -250,16 +282,32 @@ function App() {
           ))}
         </nav>
         <div className="topbar-actions">
-          <form className={searchOpen ? 'search-box search-expanded' : 'search-box'} onSubmit={(event) => { event.preventDefault(); setSearchOpen(true) }}>
+          <form ref={searchBoxRef} className={searchOpen ? 'search-box search-expanded' : 'search-box'} onSubmit={(event) => { event.preventDefault(); setSearchOpen(true) }}>
             <button type="button" className="search-open-button" aria-label="Open search" onClick={() => {
               setSearchOpen(true)
               window.requestAnimationFrame(() => searchInputRef.current?.focus())
             }}><Search size={18} aria-hidden="true" /></button>
-            <input ref={searchInputRef} aria-label="Search titles" placeholder="Search stories" value={query} onChange={(event) => { setQuery(event.target.value); setSearchOpen(true) }} onFocus={() => setSearchOpen(true)} />
-            {query && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => setQuery('')}><X size={15} /></button>}
+            <input ref={searchInputRef} aria-label="Search titles" placeholder="Search stories" value={query} onChange={(event) => { setQuery(event.target.value); setSearchOpen(true); setSuggestOpen(true) }} onFocus={() => { setSearchOpen(true); setSuggestOpen(true) }} />
+            {query && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => { setQuery(''); setSuggestOpen(false) }}><X size={15} /></button>}
+            {suggestOpen && normalizedQuery.length >= 2 && (
+              <div className="search-suggest" aria-label="TMDB suggestions">
+                {searchStatus === 'loading' && tmdbResults.length === 0 && <p className="suggest-status">Searching TMDB...</p>}
+                {searchStatus === 'error' && <p className="suggest-status">{searchError}</p>}
+                {searchStatus === 'idle' && tmdbResults.length === 0 && <p className="suggest-status">No TMDB matches for "{query.trim()}".</p>}
+                {tmdbResults.slice(0, 7).map((title) => (
+                  <button key={title.id} type="button" className="suggest-item" onClick={() => { setSelected(title); setSuggestOpen(false); setMobileMenu(false) }}>
+                    {title.image ? <img src={title.image} alt="" loading="lazy" /> : <span className="suggest-thumb-fallback"><Clapperboard size={14} /></span>}
+                    <span className="suggest-copy">
+                      <span className="suggest-name">{title.name}</span>
+                      <span className="suggest-meta">{title.kind === 'Film' ? 'Movie' : 'Series'} · {title.year || 'New'} · <Star size={9} fill="currentColor" /> {title.rating}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
           <button className="icon-button settings-trigger" title="Playback settings" aria-label="Playback settings" onClick={() => { setEmbedDrafts({ tv: tvEmbedUrl, movie: movieEmbedUrl }); setSettingsOpen(true) }}><Settings2 size={17} /></button>
-          <button className="profile-button" title="Your profile" aria-label="Your profile">M</button>
+          <button className="profile-button" title="Your profile" aria-label="Your profile">S</button>
         </div>
       </header>
 
@@ -388,14 +436,33 @@ function App() {
         </section>
       )}
 
-      <footer className="site-footer"><a className="wordmark footer-mark" href="#home"><span className="brand-mark"><span /></span><span>GLASSFLIX CINEMA</span></a><span>Stories in their own orbit.</span><span className="footer-tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB.</span><span className="footer-right">A PERSONAL CATALOG <span className="eyebrow-dot" /> 2026</span></footer>
+      <footer className="site-footer"><a className="wordmark footer-mark" href="#home"><span className="brand-mark"><span /></span><span>SAMMY FLIX</span></a><span>Stories in their own orbit.</span><span className="footer-tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB.</span><span className="footer-right">A PERSONAL CATALOG <span className="eyebrow-dot" /> 2026</span></footer>
 
       {selected && (
         <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null) }}>
           <section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
             <div className="detail-art" style={{ backgroundImage: `linear-gradient(0deg, #171e19 0%, rgba(23,30,25,.04) 72%), url("${selected.image}")` }} />
             <button className="modal-close icon-button" aria-label="Close details" onClick={() => setSelected(null)}><X size={20} /></button>
-            <div className="detail-content"><div className="eyebrow"><Sparkles size={13} /> GLASSFLIX PICKS</div><h2 id="detail-title">{selected.name}</h2><div className="detail-meta"><span className="rating"><Star size={13} fill="currentColor" /> {selected.rating}</span><span>{selected.year}</span><span>{selected.duration}</span>{!selected.tmdbId && <span className="quality">4K</span>}</div><p>{selected.description}</p><div className="detail-genres">{selected.genres.map((item) => <span key={item}>{item}</span>)}</div><div className="detail-actions"><button className="button button-primary" onClick={() => startPlayback(selected)}><Play size={16} fill="currentColor" /> Play {selected.kind.toLowerCase()}</button><button className={`button button-outline ${watchlist.includes(selected.id) ? 'saved' : ''}`} onClick={() => toggleSaved(selected)}>{watchlist.includes(selected.id) ? <Check size={17} /> : <Bookmark size={17} />} {watchlist.includes(selected.id) ? 'In My list' : 'Add to My list'}</button></div></div>
+            <div className="detail-content"><div className="eyebrow"><Sparkles size={13} /> SAMMY FLIX PICKS</div><h2 id="detail-title">{selected.name}</h2><div className="detail-meta"><span className="rating"><Star size={13} fill="currentColor" /> {selected.rating}</span><span>{selected.year}</span><span>{selected.duration}</span>{!selected.tmdbId && <span className="quality">4K</span>}</div><p>{selected.description}</p><div className="detail-genres">{selected.genres.map((item) => <span key={item}>{item}</span>)}</div><div className="detail-actions"><button className="button button-primary" onClick={() => startPlayback(selected)}><Play size={16} fill="currentColor" /> Play {selected.kind.toLowerCase()}</button><button className={`button button-outline ${watchlist.includes(selected.id) ? 'saved' : ''}`} onClick={() => toggleSaved(selected)}>{watchlist.includes(selected.id) ? <Check size={17} /> : <Bookmark size={17} />} {watchlist.includes(selected.id) ? 'In My list' : 'Add to My list'}</button></div>
+              {selected.tmdbId && (
+                <div className="detail-recs">
+                  <p className="section-kicker">TMDB SUGGESTIONS · MORE LIKE THIS</p>
+                  {recStatus === 'loading' && <p className="rec-feedback">Finding similar titles...</p>}
+                  {recStatus === 'error' && <p className="rec-feedback">Suggestions are unavailable right now.</p>}
+                  {recStatus === 'ready' && recommendations.length === 0 && <p className="rec-feedback">No suggestions for this title yet.</p>}
+                  {recommendations.length > 0 && (
+                    <div className="rec-row">
+                      {recommendations.map((rec) => (
+                        <button key={rec.id} type="button" className="rec-card" onClick={() => setSelected(rec)} aria-label={`Details for ${rec.name}`}>
+                          <img src={rec.image} alt="" loading="lazy" />
+                          <span className="rec-name">{rec.name}</span>
+                          <span className="rec-meta"><Star size={10} fill="currentColor" /> {rec.rating} · {rec.year || 'New'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}</div>
           </section>
         </div>
       )}
@@ -405,7 +472,7 @@ function App() {
           <section className="player-modal" role="dialog" aria-modal="true" aria-label={`${player.name} player`}>
             <button className="modal-close icon-button" aria-label="Close player" onClick={() => setPlayer(null)}><X size={20} /></button>
             {playerEmbedUrl
-              ? <iframe src={playerEmbedUrl} title={`${player.name} player`} sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="autoplay; picture-in-picture; encrypted-media; clipboard-write" allowFullScreen />
+              ? <iframe src={playerEmbedUrl} title={`${player.name} player`} allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write" referrerPolicy="origin" allowFullScreen />
               : <video controls autoPlay playsInline src={getAuthorizedPlaybackUrl(player) ?? undefined} />}
             <div className="player-title"><span>{player.name}</span><span>{player.year} · {player.duration}</span></div>
           </section>
