@@ -66,6 +66,33 @@ function registerTmdbProxy(server: ViteDevServer | PreviewServer, accessToken: s
         return
       }
 
+      if (requestUrl.pathname === '/api/tmdb/tv') {
+        const id = Number(requestUrl.searchParams.get('id'))
+        if (!Number.isInteger(id) || id <= 0) {
+          response.statusCode = 400
+          response.end(JSON.stringify({ error: 'TV details need a numeric id.' }))
+          return
+        }
+        const upstream = await fetchTmdb(`/tv/${id}?language=en-US`, accessToken)
+        response.statusCode = upstream.status
+        response.end(await upstream.text())
+        return
+      }
+
+      if (requestUrl.pathname === '/api/tmdb/videos') {
+        const type = requestUrl.searchParams.get('type')
+        const id = Number(requestUrl.searchParams.get('id'))
+        if ((type !== 'movie' && type !== 'tv') || !Number.isInteger(id) || id <= 0) {
+          response.statusCode = 400
+          response.end(JSON.stringify({ error: 'Videos need type=movie|tv and a numeric id.' }))
+          return
+        }
+        const upstream = await fetchTmdb(`/${type}/${id}/videos?language=en-US`, accessToken)
+        response.statusCode = upstream.status
+        response.end(await upstream.text())
+        return
+      }
+
       if (requestUrl.pathname === '/api/tmdb/recommendations') {
         const type = requestUrl.searchParams.get('type')
         const id = Number(requestUrl.searchParams.get('id'))

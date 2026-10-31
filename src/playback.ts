@@ -26,13 +26,15 @@ export function getAuthorizedEmbedPrefix(value: string, type: 'tv' | 'movie'): s
   return url.pathname.endsWith(`/${type}/`) ? url.toString() : null
 }
 
-export function getTitleEmbedUrl(title: Title, tvTemplate: string, movieTemplate: string): string | null {
+export function getTitleEmbedUrl(title: Title, tvTemplate: string, movieTemplate: string, season = 1, episode = 1): string | null {
   const type = title.kind === 'Series' ? 'tv' : 'movie'
   const prefix = getAuthorizedEmbedPrefix(type === 'tv' ? tvTemplate : movieTemplate, type)
   if (!prefix || !title.tmdbId) return null
 
+  const safeSeason = Math.max(1, Math.floor(season) || 1)
+  const safeEpisode = Math.max(1, Math.floor(episode) || 1)
   const url = new URL(prefix)
-  url.pathname = `${url.pathname}${title.tmdbId}${type === 'tv' ? '/1/1' : ''}`
+  url.pathname = `${url.pathname}${title.tmdbId}${type === 'tv' ? `/${safeSeason}/${safeEpisode}` : ''}`
   return url.toString()
 }
 

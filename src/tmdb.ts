@@ -145,6 +145,35 @@ function normalizeDiscoverItems(items: TmdbDiscoverItem[], fallbackType?: 'movie
   })
 }
 
+type TmdbSeasonItem = { season_number?: number; episode_count?: number }
+type TmdbTvDetails = { seasons?: TmdbSeasonItem[] }
+
+export type SeasonInfo = { season: number; episodes: number }
+
+export async function fetchTvSeasons(tmdbId: number, signal: AbortSignal): Promise<SeasonInfo[]> {
+  const payload = publicApiKey
+    ? await requestTmdb<TmdbTvDetails>(`/tv/${tmdbId}?language=en-US`, signal)
+    : await requestTmdb<TmdbTvDetails>(`/tv?id=${tmdbId}`, signal)
+  return (payload.seasons ?? [])
+    .filter((item) => (item.season_number ?? 0) > 0 && (item.episode_count ?? 0) > 0)
+    .map((item) => ({ season: item.season_number as number, episodes: item.episode_count as number }))
+}
+
+type TmdbVideo = { key?: string; site?: string; type?: string; official?: boolean }
+
+export async function fetchTmdbTrailer(title: Title, signal: AbortSignal): Promise<string | null> {
+  if (!title.tmdbId) return null
+  const type = title.kind === 'Film' ? 'movie' : 'tv'
+  const payload = publicApiKey
+    ? await requestTmdb<{ results?: TmdbVideo[] }>(`/${type}/${title.tmdbId}/videos?language=en-US`, signal)
+    : await requestTmdb<{ results?: TmdbVideo[] }>(`/videos?type=${type}&id=${title.tmdbId}`, signal)
+  const videos = (payload.results ?? []).filter((video) => video.site === 'YouTube' && video.key)
+  const pick = videos.find((video) => video.type === 'Trailer' && video.official)
+    ?? videos.find((video) => video.type === 'Trailer')
+    ?? videos.find((video) => video.type === 'Teaser')
+  return pick?.key ?? null
+}
+
 export async function fetchTmdbRecommendations(title: Title, signal: AbortSignal): Promise<Title[]> {
   if (!title.tmdbId) return []
   const type = title.kind === 'Film' ? 'movie' : 'tv'

@@ -5,18 +5,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Film,
   Info,
   Menu,
   Play,
   Search,
   Settings2,
+  Shuffle,
+  SkipForward,
   Sparkles,
   Star,
   X,
 } from 'lucide-react'
 import { catalog, genres, type Title } from './catalog'
 import { getAuthorizedEmbedPrefix, getAuthorizedPlaybackUrl, getTitleEmbedUrl } from './playback'
-import { fetchTmdbHome, fetchTmdbRecommendations, searchTmdb, type TmdbHomeCollections } from './tmdb'
+import { fetchTmdbHome, fetchTmdbRecommendations, fetchTmdbTrailer, fetchTvSeasons, searchTmdb, type SeasonInfo, type TmdbHomeCollections } from './tmdb'
 
 type View = 'For you' | 'Films' | 'Series' | 'My list'
 
@@ -42,6 +45,26 @@ function readSavedTmdbTitles(): Title[] {
       && typeof item.name === 'string'
       && (item.kind === 'Film' || item.kind === 'Series')
       && Array.isArray(item.genres))
+  } catch {
+    return []
+  }
+}
+
+type ContinueEntry = { title: Title; season: number; episode: number; playedAt: number }
+
+function readContinueList(): ContinueEntry[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem('morrow-continue') ?? '[]')
+    if (!Array.isArray(value)) return []
+    return value.filter((item): item is ContinueEntry => typeof item === 'object' && item !== null
+      && typeof item.title === 'object' && item.title !== null
+      && typeof item.title.id === 'string'
+      && typeof item.title.name === 'string'
+      && (item.title.kind === 'Film' || item.title.kind === 'Series')
+      && Array.isArray(item.title.genres)
+      && typeof item.season === 'number'
+      && typeof item.episode === 'number'
+      && typeof item.playedAt === 'number')
   } catch {
     return []
   }
@@ -79,6 +102,12 @@ function App() {
   const searchBoxRef = useRef<HTMLFormElement>(null)
   const [recommendations, setRecommendations] = useState<Title[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [continueList, setContinueList] = useState<ContinueEntry[]>(readContinueList)
+  const [playerSeason, setPlayerSeason] = useState(1)
+  const [playerEpisode, setPlayerEpisode] = useState(1)
+  const [seasons, setSeasons] = useState<SeasonInfo[]>([])
+  const [trailerKey, setTrailerKey] = useState<string | null>(null)
+  const [trailer, setTrailer] = useState<Title | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tvEmbedUrl, setTvEmbedUrl] = useState(() => readEmbedSetting('morrow-tv-embed-url', DEFAULT_TV_EMBED_URL, 'tv', 'morrow-embed-url'))
   const [movieEmbedUrl, setMovieEmbedUrl] = useState(() => readEmbedSetting('morrow-movie-embed-url', DEFAULT_MOVIE_EMBED_URL, 'movie'))
@@ -100,15 +129,49 @@ function App() {
   }, [savedTmdbTitles])
 
   useEffect(() => {
+    localStorage.setItem('morrow-continue', JSON.stringify(continueList))
+  }, [continueList])
+
+  useEffect(() => {
+    if (!player) return
+    setContinueList((current) => [
+      { title: player, season: playerSeason, episode: playerEpisode, playedAt: Date.now() },
+      ...current.filter((entry) => entry.title.id !== player.id),
+    ].slice(0, 12))
+  }, [player, playerSeason, playerEpisode])
+
+  useEffect(() => {
+    if (!player?.tmdbId || player.kind !== 'Series') {
+      setSeasons([])
+      return
+    }
+    const controller = new AbortController()
+    fetchTvSeasons(player.tmdbId, controller.signal).then(setSeasons).catch(() => {})
+    return () => controller.abort()
+  }, [player?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setTrailerKey(null)
+    if (!selected?.tmdbId) return
+    const controller = new AbortController()
+    fetchTmdbTrailer(selected, controller.signal).then(setTrailerKey).catch(() => {})
+    return () => controller.abort()
+  }, [selected?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     persistEmbedSetting('morrow-tv-embed-url', tvEmbedUrl, DEFAULT_TV_EMBED_URL)
     persistEmbedSetting('morrow-movie-embed-url', movieEmbedUrl, DEFAULT_MOVIE_EMBED_URL)
     localStorage.removeItem('morrow-embed-url')
   }, [tvEmbedUrl, movieEmbedUrl])
 
   useEffect(() => {
-    if (!selected && !player && !settingsOpen && !suggestOpen) return
+    if (!selected && !player && !settingsOpen && !suggestOpen && !trailer) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (trailer) {
+          setTrailer(null)
+          return
+        }
         setSelected(null)
         setPlayer(null)
         setSettingsOpen(false)
@@ -117,7 +180,7 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selected, player, settingsOpen, suggestOpen])
+  }, [selected, player, settingsOpen, suggestOpen, trailer])
 
   useEffect(() => {
     if (!suggestOpen) return
@@ -260,15 +323,45 @@ function App() {
     setNotice(saved ? 'Removed from My list' : 'Added to My list')
   }
 
-  const startPlayback = (title: Title) => {
-    const embedUrl = getTitleEmbedUrl(title, tvEmbedUrl, movieEmbedUrl)
+  const startPlayback = (title: Title, season?: number, episode?: number) => {
+    const saved = continueList.find((entry) => entry.title.id === title.id)
+    const resumeSeason = season ?? saved?.season ?? 1
+    const resumeEpisode = episode ?? saved?.episode ?? 1
+    const embedUrl = getTitleEmbedUrl(title, tvEmbedUrl, movieEmbedUrl, resumeSeason, resumeEpisode)
     if (!embedUrl && !getAuthorizedPlaybackUrl(title)) {
       setSelected(title)
       setNotice('No matching authorized embed URL is configured for this title.')
       return
     }
     setSelected(null)
+    setPlayerSeason(resumeSeason)
+    setPlayerEpisode(resumeEpisode)
     setPlayer(title)
+    if (title.kind === 'Series' && saved && !season && (saved.season > 1 || saved.episode > 1)) {
+      setNotice(`Resuming at S${saved.season} E${saved.episode}`)
+    }
+  }
+
+  const currentSeasonEpisodes = seasons.find((item) => item.season === playerSeason)?.episodes ?? Math.max(playerEpisode, 24)
+
+  const playNextEpisode = () => {
+    if (playerEpisode < currentSeasonEpisodes) {
+      setPlayerEpisode(playerEpisode + 1)
+      return
+    }
+    const next = seasons.find((item) => item.season > playerSeason)
+    if (next) {
+      setPlayerSeason(next.season)
+      setPlayerEpisode(1)
+    } else {
+      setNotice('You are on the latest episode.')
+    }
+  }
+
+  const surpriseMe = () => {
+    const pool = [...(homeCollections?.trending ?? []), ...(homeCollections?.popular ?? []), ...(homeCollections?.topRated ?? [])]
+    if (!pool.length) return
+    setSelected(pool[Math.floor(Math.random() * pool.length)])
   }
 
   const trending = homeCollections?.trending ?? []
@@ -277,7 +370,7 @@ function App() {
   const moveHero = (direction: -1 | 1) => {
     setHeroIndex((current) => (current + direction + trending.length) % trending.length)
   }
-  const playerEmbedUrl = player ? getTitleEmbedUrl(player, tvEmbedUrl, movieEmbedUrl) : null
+  const playerEmbedUrl = player ? getTitleEmbedUrl(player, tvEmbedUrl, movieEmbedUrl, playerSeason, playerEpisode) : null
 
   return (
     <main className="app-shell">
@@ -393,12 +486,31 @@ function App() {
       ))}
 
       <section className="browse-section" id="home">
+        {isHomeFeed && continueList.length > 0 && (
+          <div className="continue-band">
+            <span className="continue-icon"><Play size={15} fill="currentColor" /></span>
+            <div className="continue-copy">
+              <strong>Continue watching</strong>
+              <span>{continueList[0].title.name}{continueList[0].title.kind === 'Series' ? ` · S${continueList[0].season} E${continueList[0].episode}` : ''}</span>
+            </div>
+            <button className="continue-title" onClick={() => setSelected(continueList[0].title)}>
+              <strong>{continueList[0].title.name}</strong>
+              <span>{continueList[0].title.kind}{continueList[0].title.year ? ` · ${continueList[0].title.year}` : ''}</span>
+            </button>
+            <button className="continue-play" aria-label={`Resume ${continueList[0].title.name}`} title="Resume" onClick={() => startPlayback(continueList[0].title)}><Play size={15} fill="currentColor" /></button>
+            <div className="continue-art" aria-hidden="true" style={{ backgroundImage: `url("${continueList[0].title.backdropImage || continueList[0].title.image}")` }} />
+            <button className="continue-clear icon-button" aria-label="Remove from continue watching" title="Remove" onClick={() => setContinueList((current) => current.slice(1))}><X size={13} /></button>
+          </div>
+        )}
         <div className="section-head">
           <div>
             <p className="section-kicker">{isHomeFeed ? 'TMDB · POPULAR' : 'A little something for tonight'}</p>
             <h2>{isHomeFeed ? 'Popular movies and series' : view === 'My list' ? 'Your saved stories' : view === 'Films' ? 'Popular movies' : view === 'Series' ? 'Popular TV series' : 'Stories worth staying in for'}</h2>
           </div>
-          <button className="text-button" onClick={() => { setView('For you'); setGenre('All'); setQuery('') }}>Browse all <ChevronRight size={17} /></button>
+          <div className="head-actions">
+            {isHomeFeed && homeStatus === 'ready' && <button className="text-button" onClick={surpriseMe}><Shuffle size={15} /> Surprise me</button>}
+            <button className="text-button" onClick={() => { setView('For you'); setGenre('All'); setQuery('') }}>Browse all <ChevronRight size={17} /></button>
+          </div>
         </div>
 
         <div className="genre-row" aria-label="Filter by genre">
@@ -459,7 +571,7 @@ function App() {
           <section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
             <div className="detail-art" style={{ backgroundImage: `linear-gradient(0deg, #171e19 0%, rgba(23,30,25,.04) 72%), url("${selected.image}")` }} />
             <button className="modal-close icon-button" aria-label="Close details" onClick={() => setSelected(null)}><X size={20} /></button>
-            <div className="detail-content"><div className="eyebrow"><Sparkles size={13} /> SAMMY FLIX PICKS</div><h2 id="detail-title">{selected.name}</h2><div className="detail-meta"><span className="rating"><Star size={13} fill="currentColor" /> {selected.rating}</span><span>{selected.year}</span><span>{selected.duration}</span>{!selected.tmdbId && <span className="quality">4K</span>}</div><p>{selected.description}</p><div className="detail-genres">{selected.genres.map((item) => <span key={item}>{item}</span>)}</div><div className="detail-actions"><button className="button button-primary" onClick={() => startPlayback(selected)}><Play size={16} fill="currentColor" /> Play {selected.kind.toLowerCase()}</button><button className={`button button-outline ${watchlist.includes(selected.id) ? 'saved' : ''}`} onClick={() => toggleSaved(selected)}>{watchlist.includes(selected.id) ? <Check size={17} /> : <Bookmark size={17} />} {watchlist.includes(selected.id) ? 'In My list' : 'Add to My list'}</button></div>
+            <div className="detail-content"><div className="eyebrow"><Sparkles size={13} /> SAMMY FLIX PICKS</div><h2 id="detail-title">{selected.name}</h2><div className="detail-meta"><span className="rating"><Star size={13} fill="currentColor" /> {selected.rating}</span><span>{selected.year}</span><span>{selected.duration}</span>{!selected.tmdbId && <span className="quality">4K</span>}</div><p>{selected.description}</p><div className="detail-genres">{selected.genres.map((item) => <span key={item}>{item}</span>)}</div><div className="detail-actions"><button className="button button-primary" onClick={() => startPlayback(selected)}><Play size={16} fill="currentColor" /> Play {selected.kind.toLowerCase()}</button>{trailerKey && <button className="button button-outline" onClick={() => setTrailer(selected)}><Film size={16} /> Trailer</button>}<button className={`button button-outline ${watchlist.includes(selected.id) ? 'saved' : ''}`} onClick={() => toggleSaved(selected)}>{watchlist.includes(selected.id) ? <Check size={17} /> : <Bookmark size={17} />} {watchlist.includes(selected.id) ? 'In My list' : 'Add to My list'}</button></div>
               {selected.tmdbId && (
                 <div className="detail-recs">
                   <p className="section-kicker">TMDB SUGGESTIONS · MORE LIKE THIS</p>
@@ -490,7 +602,32 @@ function App() {
             {playerEmbedUrl
               ? <iframe src={playerEmbedUrl} title={`${player.name} player`} sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write" referrerPolicy="origin" allowFullScreen />
               : <video controls autoPlay playsInline src={getAuthorizedPlaybackUrl(player) ?? undefined} />}
-            <div className="player-title"><span>{player.name}</span><span>{player.year} · {player.duration}</span></div>
+            {player.kind === 'Series' && playerEmbedUrl && (
+              <div className="episode-bar">
+                <label>Season
+                  <select value={playerSeason} onChange={(event) => { setPlayerSeason(Number(event.target.value)); setPlayerEpisode(1) }}>
+                    {(seasons.length ? seasons : [{ season: playerSeason, episodes: currentSeasonEpisodes }]).map((item) => <option key={item.season} value={item.season}>S{item.season}</option>)}
+                  </select>
+                </label>
+                <label>Episode
+                  <select value={playerEpisode} onChange={(event) => setPlayerEpisode(Number(event.target.value))}>
+                    {Array.from({ length: currentSeasonEpisodes }, (_, index) => index + 1).map((episode) => <option key={episode} value={episode}>E{episode}</option>)}
+                  </select>
+                </label>
+                <button className="button button-outline next-episode" onClick={playNextEpisode}><SkipForward size={15} /> Next episode</button>
+              </div>
+            )}
+            <div className="player-title"><span>{player.name}{player.kind === 'Series' ? ` · S${playerSeason} E${playerEpisode}` : ''}</span><span>{player.year} · {player.duration}</span></div>
+          </section>
+        </div>
+      )}
+
+      {trailer && trailerKey && (
+        <div className="overlay player-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTrailer(null) }}>
+          <section className="player-modal" role="dialog" aria-modal="true" aria-label={`${trailer.name} trailer`}>
+            <button className="modal-close icon-button" aria-label="Close trailer" onClick={() => setTrailer(null)}><X size={20} /></button>
+            <iframe src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&rel=0`} title={`${trailer.name} trailer`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen />
+            <div className="player-title"><span>{trailer.name} · Trailer</span><span>YouTube</span></div>
           </section>
         </div>
       )}
