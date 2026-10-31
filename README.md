@@ -23,7 +23,7 @@ npm run dev
 
 ## Playback
 
-The player URL prefixes are set directly in `src/App.tsx`: `https://nxsha.space/embed/tv/` and `https://nxsha.space/embed/movie/`. TMDB IDs are appended to those prefixes; TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding. The player iframe is not sandboxed so the embedded player runs with its full feature set; only use embed sources you trust, since an unsandboxed embed can open popups and redirects.
+The player URL prefixes are set directly in `src/App.tsx`: `https://nxsha.space/embed/tv/` and `https://nxsha.space/embed/movie/`. TMDB IDs are appended to those prefixes; TV titles use season 1, episode 1. Playback sources must be authorized and allow embedding. The player iframe is sandboxed without `allow-popups` or `allow-top-navigation`, so ad scripts inside the embed cannot open new tabs or redirect the page. UI the provider draws inside its own player (server pickers, app promos) cannot be removed from outside the iframe.
 
 ## Attribution
 
