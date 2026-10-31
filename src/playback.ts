@@ -35,6 +35,11 @@ export function getTitleEmbedUrl(title: Title, tvTemplate: string, movieTemplate
   const safeEpisode = Math.max(1, Math.floor(episode) || 1)
   const url = new URL(prefix)
   url.pathname = `${url.pathname}${title.tmdbId}${type === 'tv' ? `/${safeSeason}/${safeEpisode}` : ''}`
+  // Player tuning params (ignored by providers that do not support them):
+  // hide the app promo badge and download button, match the site accent color.
+  url.searchParams.set('disable_app_ad', 'true')
+  url.searchParams.set('disable_dl_button', 'true')
+  url.searchParams.set('color', '#d5f36a')
   return url.toString()
 }
 
